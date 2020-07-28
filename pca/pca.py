@@ -5,8 +5,10 @@ import numpy as np
 #TODO: pytorch Device-{cpu, cuda}
 
 class LPCA:
-    def __init__(self, dt=0.05):
+    def __init__(self, entropy=0.35, dt=0.05, min_tolerance = 2):
+        self.entropy = entropy
         self.dt = dt
+        self.min_tolerance = min_tolerance
     
     def __torch_standard_scaler__(self, x):
         m = x.mean(0, keepdim=True)
@@ -62,40 +64,45 @@ class LPCA:
         #del _wei
         return input_X
     
-    def __l_pca__(self, X, entropy, Reduce):
+    def __l_pca_reduce__(self, X, entropy):
         X_std = self.__torch_standard_scaler__(X)
         if entropy > 0.0:
                 X_std = self.__weight_mask__(X_std, entropy)
-        if Reduce:
-            cov_mat = self.__conv_torch__(X_std)
-            eig_val, eig_vecs =  t.eig(cov_mat, eigenvectors=True)
-            eig_pairs = [(t.abs(eig_val[i]), eig_vecs[:,i]) for i in range(len(eig_val))]
-            _delete_idx = self.__sort_eig_pair_to_delete__(eig_pairs)
+
+        cov_mat = self.__conv_torch__(X_std)
+        eig_val, eig_vecs =  t.eig(cov_mat, eigenvectors=True)
+        eig_pairs = [(t.abs(eig_val[i]), eig_vecs[:,i]) for i in range(len(eig_val))]
+        _delete_idx = self.__sort_eig_pair_to_delete__(eig_pairs)
             
-            #del X_std; cov_mat; eig_val; eig_vecs; eig_pairs
-            return _delete_idx
-        else:
-            cov_mat = self.__conv_torch__(X_std)
-            eig_val, eig_vecs =  t.eig(cov_mat, eigenvectors=True)
-            eig_pairs = [(t.abs(eig_val[i]), eig_vecs[:,i]) for i in range(len(eig_val))]
-            m_w = self.__sort_eig_pair__(eig_pairs)
+        #del X_std; cov_mat; eig_val; eig_vecs; eig_pairs
+        return _delete_idx
+
+    def __l_pca__(self, X, entropy):
+        X_std = self.__torch_standard_scaler__(X)
+        if entropy > 0.0:
+                X_std = self.__weight_mask__(X_std, entropy)
+        
+        cov_mat = self.__conv_torch__(X_std)
+        eig_val, eig_vecs =  t.eig(cov_mat, eigenvectors=True)
+        eig_pairs = [(t.abs(eig_val[i]), eig_vecs[:,i]) for i in range(len(eig_val))]
+        m_w = self.__sort_eig_pair__(eig_pairs)
             
-            #del X_std; cov_mat; eig_val; eig_vecs; eig_pairs
-            return m_w
+        #del X_std; cov_mat; eig_val; eig_vecs; eig_pairs
+        return m_w
     
-    def l_pca(self, X, tolerance, min_tolerance, entropy, C=False):
+    def l_pca(self, X, min_tolerance, C=False):
+        entropy = self.entropy
+        min_tolerance = self.min_tolerance
+
         if type(X) is np.ndarray:    
             X = t.from_numpy(X)
         list_mw = []
-        list_xs = []
         
         ## Reduction Dimension with entropy ?? ->>
-        Reduce = True
         size_reduce = int(X.shape[1]*0.5)
         while True:
-            _delete_idx = self.__l_pca__(X, entropy, Reduce)
+            _delete_idx = self.__l_pca_reduce__(X, entropy)
             if _delete_idx is None or X.shape[1] < size_reduce:
-                Reduce = False
                 break
             else:
                 X = X.numpy()
@@ -104,7 +111,7 @@ class LPCA:
             
         # Next compute m_w for anny entropy
         while entropy >= 0:
-            m_w = self.__l_pca__(X, entropy, Reduce) # Return idx to remove
+            m_w = self.__l_pca__(X, entropy) # Return idx to remove
             if m_w.shape[1] < min_tolerance:
                 break
             list_mw.append(m_w)
