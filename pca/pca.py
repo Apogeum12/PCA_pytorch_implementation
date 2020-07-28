@@ -72,7 +72,7 @@ class LPCA:
                 X_std = self.__weight_mask__(X_std, entropy)
 
         cov_mat = self.__conv_torch__(X_std)
-        eig_val, eig_vecs =  t.eig(cov_mat, eigenvectors=True).to(self.device)
+        eig_val, eig_vecs =  t.eig(cov_mat, eigenvectors=True)
         eig_pairs = [(t.abs(eig_val[i]), eig_vecs[:,i]) for i in range(len(eig_val))]
         _delete_idx = self.__sort_eig_pair_to_delete__(eig_pairs)
             
@@ -85,7 +85,7 @@ class LPCA:
                 X_std = self.__weight_mask__(X_std, entropy)
         
         cov_mat = self.__conv_torch__(X_std)
-        eig_val, eig_vecs =  t.eig(cov_mat, eigenvectors=True).to(self.device)
+        eig_val, eig_vecs =  t.eig(cov_mat, eigenvectors=True)
         eig_pairs = [(t.abs(eig_val[i]), eig_vecs[:,i]) for i in range(len(eig_val))]
         m_w = self.__sort_eig_pair__(eig_pairs)
             
