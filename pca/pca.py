@@ -2,17 +2,19 @@ from scipy.signal import correlate2d
 import torch as t
 import numpy as np
 
-#TODO: pytorch Device-{cpu, cuda}
-
 class LPCA:
-    def __init__(self, entropy=0.35, dt=0.05, min_tolerance = 2):
+    def __init__(self, entropy=0.35, dt=0.05, min_tolerance = 2, gpu = False):
         self.entropy = entropy
         self.dt = dt
         self.min_tolerance = min_tolerance
+        if gpu:
+            self.device = ("cuda" if t.cuda.is_available() else "cpu")
+        else:
+            self.device = ("cpu")
     
     def __torch_standard_scaler__(self, x):
-        m = x.mean(0, keepdim=True)
-        s = x.std(0, unbiased=False, keepdim=True)
+        m = x.mean(0, keepdim=True).to(self.device)
+        s = x.std(0, unbiased=False, keepdim=True).to(self.device)
         x -= m
         x /= s
         #del m; s
@@ -21,7 +23,7 @@ class LPCA:
     def __conv_torch__(self, x_std, y=None):
         if y is not None:
             x_std = t.cat((x_std, y), dim=1)
-        x_std_exp = t.mean(x_std, dim=0)
+        x_std_exp = t.mean(x_std, dim=0).to(self.device)
         x = (x_std - x_std_exp).T
         cov = x.mm(x.T) / (x.size(1) - 1)
         #del X_std_exp; X
@@ -70,7 +72,7 @@ class LPCA:
                 X_std = self.__weight_mask__(X_std, entropy)
 
         cov_mat = self.__conv_torch__(X_std)
-        eig_val, eig_vecs =  t.eig(cov_mat, eigenvectors=True)
+        eig_val, eig_vecs =  t.eig(cov_mat, eigenvectors=True).to(self.device)
         eig_pairs = [(t.abs(eig_val[i]), eig_vecs[:,i]) for i in range(len(eig_val))]
         _delete_idx = self.__sort_eig_pair_to_delete__(eig_pairs)
             
@@ -83,19 +85,19 @@ class LPCA:
                 X_std = self.__weight_mask__(X_std, entropy)
         
         cov_mat = self.__conv_torch__(X_std)
-        eig_val, eig_vecs =  t.eig(cov_mat, eigenvectors=True)
+        eig_val, eig_vecs =  t.eig(cov_mat, eigenvectors=True).to(self.device)
         eig_pairs = [(t.abs(eig_val[i]), eig_vecs[:,i]) for i in range(len(eig_val))]
         m_w = self.__sort_eig_pair__(eig_pairs)
             
         #del X_std; cov_mat; eig_val; eig_vecs; eig_pairs
         return m_w
     
-    def l_pca(self, X, min_tolerance, C=False):
+    def l_pca(self, X, C=False):
         entropy = self.entropy
         min_tolerance = self.min_tolerance
 
         if type(X) is np.ndarray:    
-            X = t.from_numpy(X)
+            X = t.from_numpy(X).to(self.device)
         list_mw = []
         
         ## Reduction Dimension with entropy ?? ->>
