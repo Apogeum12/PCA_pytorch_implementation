@@ -3,6 +3,14 @@ import torch as t
 import numpy as np
 
 class LPCA:
+    """
+    Parameters
+    ----------
+    entropy: float, default, 0.35
+        Say how many date delete from source in first step
+    dt: float, default, 0.05
+        Distance between consecutive masks. 
+    """
     def __init__(self, entropy=0.35, dt=0.05, min_tolerance = 2, gpu = False):
         self.entropy = entropy
         self.dt = dt
@@ -12,7 +20,7 @@ class LPCA:
         else:
             self.device = ("cpu")
     
-    def __torch_standard_scaler__(self, x):
+    def _torch_standard_scaler(self, x):
         m = x.mean(0, keepdim=True).to(self.device)
         s = x.std(0, unbiased=False, keepdim=True).to(self.device)
         x -= m
@@ -20,7 +28,7 @@ class LPCA:
         #del m; s
         return x
     
-    def __conv_torch__(self, x_std, y=None):
+    def _conv_torch(self, x_std, y=None):
         if y is not None:
             x_std = t.cat((x_std, y), dim=1)
         x_std_exp = t.mean(x_std, dim=0).to(self.device)
@@ -29,7 +37,7 @@ class LPCA:
         #del X_std_exp; X
         return cov
     
-    def __sort_eig_pair__(self, eig_):
+    def _sort_eig_pair(self, eig_):
         _s = t.sum(t.tensor([e_[0].numpy() for e_ in eig_]))
         dim_x = len(eig_[0][1])
         k, _idx = 0.0, 0
@@ -45,7 +53,7 @@ class LPCA:
         #del _s; dim_x; k; _idx; e_; _w
         return matrix_w
     
-    def __sort_eig_pair_to_delete__(self, eig_):
+    def _sort_eig_pair_to_delete(self, eig_):
         _s = t.sum(t.tensor([e_[0].numpy() for e_ in eig_]))
         e_ = [eg_[0].numpy() for eg_ in eig_]
         
@@ -58,7 +66,7 @@ class LPCA:
         #del _s;  e_
         return _i
     
-    def __weight_mask__(self, input_X, _e):
+    def _weight_mask(self, input_X, _e):
         _wei = t.ones((input_X.size(0),input_X.size(1)))
         for _ in range(int(_wei.size(0)*_wei.size(1)*_e)+1):
             _wei[np.random.randint(0, _wei.size(0)), np.random.randint(0, _wei.size(1))] = 0
@@ -66,28 +74,28 @@ class LPCA:
         #del _wei
         return input_X
     
-    def __l_pca_reduce__(self, X, entropy):
-        X_std = self.__torch_standard_scaler__(X)
+    def _lpca_reduce(self, X, entropy):
+        X_std = self._torch_standard_scaler(X)
         if entropy > 0.0:
-                X_std = self.__weight_mask__(X_std, entropy)
+                X_std = self._weight_mask(X_std, entropy)
 
-        cov_mat = self.__conv_torch__(X_std)
+        cov_mat = self._conv_torch(X_std)
         eig_val, eig_vecs =  t.eig(cov_mat, eigenvectors=True)
         eig_pairs = [(t.abs(eig_val[i]), eig_vecs[:,i]) for i in range(len(eig_val))]
-        _delete_idx = self.__sort_eig_pair_to_delete__(eig_pairs)
+        _delete_idx = self._sort_eig_pair_to_delete(eig_pairs)
             
         #del X_std; cov_mat; eig_val; eig_vecs; eig_pairs
         return _delete_idx
 
-    def __l_pca__(self, X, entropy):
-        X_std = self.__torch_standard_scaler__(X)
+    def _lpca(self, X, entropy):
+        X_std = self._torch_standard_scaler(X)
         if entropy > 0.0:
-                X_std = self.__weight_mask__(X_std, entropy)
+                X_std = self._weight_mask(X_std, entropy)
         
-        cov_mat = self.__conv_torch__(X_std)
+        cov_mat = self._conv_torch(X_std)
         eig_val, eig_vecs =  t.eig(cov_mat, eigenvectors=True)
         eig_pairs = [(t.abs(eig_val[i]), eig_vecs[:,i]) for i in range(len(eig_val))]
-        m_w = self.__sort_eig_pair__(eig_pairs)
+        m_w = self._sort_eig_pair(eig_pairs)
             
         #del X_std; cov_mat; eig_val; eig_vecs; eig_pairs
         return m_w
@@ -103,7 +111,7 @@ class LPCA:
         ## Reduction Dimension with entropy ?? ->>
         size_reduce = int(X.shape[1]*0.5)
         while True:
-            _delete_idx = self.__l_pca_reduce__(X, entropy)
+            _delete_idx = self._lpca_reduce(X, entropy)
             if _delete_idx is None or X.shape[1] < size_reduce:
                 break
             else:
@@ -113,7 +121,7 @@ class LPCA:
             
         # Next compute m_w for anny entropy
         while entropy >= 0:
-            m_w = self.__l_pca__(X, entropy) # Return idx to remove
+            m_w = self._lpca(X, entropy) # Return idx to remove
             if m_w.shape[1] < min_tolerance:
                 break
             list_mw.append(m_w)
