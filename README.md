@@ -131,16 +131,6 @@ print("\n Finish in {}s".format(_time))
      Finish in 91.68692302703857s
 
 
-
-```python
-a = [1, 2, 3, 4, 5]
-print(C_x_bank.shape)
-```
-
-    torch.Size([11, 11])
-
-
-
 ```python
 import matplotlib.pyplot as plt
 import torch as t
