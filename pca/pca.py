@@ -109,7 +109,7 @@ class LPCA:
         list_mw = []
         
         ## Reduction Dimension with entropy ?? ->>
-        size_reduce = int(X.shape[1]*0.5)
+        size_reduce = (int(X.shape[1]*0.5) if X.shape[1] <=20 else int(X.shape[1]*0.25))
         while True:
             _delete_idx = self._lpca_reduce(X, entropy)
             if _delete_idx is None or X.shape[1] < size_reduce:
@@ -129,10 +129,18 @@ class LPCA:
         
         
         if C:
-            C = correlate2d(m_w[-1], m_w[-2], mode='same')
-            for i in range(len(m_w)-1, 0, 2):
-                if i-1 >= 0:
-                    C = correlate2d(C, m_w[i], mode='same')
-            return X, t.tensor(list_mw[-1]), t.tensor(C)
+            C_out = t.ones((list_mw[-1].shape[0], list_mw[-1].shape[1])).double()
+            C = correlate2d(list_mw[-1], list_mw[-2], mode='same')
+            if (C.shape[0] == C.shape[1]):
+                for i in range(len(list_mw)-2, 0, 2):
+                    if i-1 >=0:
+                        d = correlate2d(C, list_mw[i], mode='same')
+                        if (d.shape[0] != list_mw[-1].shape[1]) or (d.shape[0] != d.shape[1]):
+                            break
+                        else:
+                            C = d
+                C_out = t.tensor(C)
+            
+            return X, t.tensor(list_mw[-1]), C_out
         else:
             return X, t.tensor(list_mw[-1])
